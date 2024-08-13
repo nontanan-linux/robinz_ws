@@ -1,0 +1,7 @@
+cpp_node:
+  ros__parameters:
+    parameter_name: parameter_value
+
+python_node:
+  ros__parameters:
+    parameter_name: parameter_value
