@@ -5,6 +5,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Path
 from nav_msgs.msg import Odometry
+from tf_transformations import quaternion_from_euler
 import csv
 import os
 import time
@@ -86,6 +87,8 @@ class PurePursuitNode(Node):
         self.linear_vel = self.get_parameter('linear_vel').get_parameter_value().double_value
         # self.pose_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
         self.path_publisher = self.create_publisher(Path, 'tracking_path', 10)
+        self.curr_publisher = self.create_publisher(Odometry, 'sym_odom', 10)
+        self.goal_publisher = self.create_publisher(Odometry, 'target', 10)
         self.cmd_vel_publisher = self.create_publisher(Twist, '/ctrl_vel', 10)
 
         # initial state
@@ -114,8 +117,9 @@ class PurePursuitNode(Node):
         if(flag):
             self.path = self.refrom_path_data(fileName)
             self.path_data = self.load_path_from_csv(fileName)
-            self.path_time = self.create_timer(0.5, self.publish_path)
-        self.plot = True    
+            # self.path_msgs = self.load_path_from_csv()
+        self.path_time = self.create_timer(0.5, self.publish_path)
+        self.plot = True
 
     def verify_path_data(self, fileName):
         path_reform = []
@@ -187,119 +191,6 @@ class PurePursuitNode(Node):
             return 1
         else:
             return -1
-    
-    # def pure_pursuit_step(self, ref_path, currentPos, currentHeading, lookAheadDis, LFindex):
-    #     goalPt = Odometry()
-    #     sol_pt1 = Odometry()
-    #     sol_pt2 = Odometry()
-    #     path = ref_path
-    #     # use for loop to search intersections
-    #     lastFoundIndex = LFindex
-    #     intersectFound = False
-    #     startingIndex = lastFoundIndex
-    #     # for idx in range (startingIndex, len(path)-1):
-    #     for idx in range(startingIndex, 20):
-    #         x1 = path[idx][0] - currentPos.pose.pose.position.x
-    #         y1 = path[idx][1] - currentPos.pose.pose.position.y
-    #         x2 = path[idx+1][0] - currentPos.pose.pose.position.x
-    #         y2 = path[idx+1][1] - currentPos.pose.pose.position.y
-    #         # print("idx: {}, pt1: {}, pt2: {}".format(idx, [x1,y1], [x2,y2]))
-    #         dx = x2 - x1
-    #         dy = y2 - y1
-    #         # dr = math.sqrt((x2-x1)**2 + (y2-y1)**2)
-    #         dr = math.sqrt (dx**2 + dy**2)
-    #         D = x1*y2 - x2*y1
-    #         # discriminant = (self.lookahead_distance**2)*(dr**2) - D**2
-    #         discriminant = (lookAheadDis**2) * (dr**2) - D**2
-    #         if discriminant >= 0:
-    #             sol_x1 = (D * dy + self.sgn(dy) * dx * np.sqrt(discriminant)) / dr**2
-    #             sol_x2 = (D * dy - self.sgn(dy) * dx * np.sqrt(discriminant)) / dr**2
-    #             sol_y1 = (- D * dx + abs(dy) * np.sqrt(discriminant)) / dr**2
-    #             sol_y2 = (- D * dx - abs(dy) * np.sqrt(discriminant)) / dr**2
-
-    #             sol_pt1.pose.pose.position.x = sol_x1 + currentPos.pose.pose.position.x
-    #             sol_pt1.pose.pose.position.y = sol_y1 + currentPos.pose.pose.position.y
-    #             sol_pt2.pose.pose.position.x = sol_x2 + currentPos.pose.pose.position.x
-    #             sol_pt2.pose.pose.position.y = sol_y2 + currentPos.pose.pose.position.y
-
-    #             # sol_pt1 = [sol_x1 + currentX, sol_y1 + currentY]
-    #             # sol_pt2 = [sol_x2 + currentX, sol_y2 + currentY]
-    #             # end of line-circle intersection code
-
-    #             minX = min(path[idx][0], path[idx+1][0])
-    #             minY = min(path[idx][1], path[idx+1][1])
-    #             maxX = max(path[idx][0], path[idx+1][0])
-    #             maxY = max(path[idx][1], path[idx+1][1])
-
-    #             # if one or both of the solutions are in range
-    #             if ((minX <= sol_pt1.pose.pose.position.x <= maxX) and (minY <= sol_pt1.pose.pose.position.y <= maxY)) or ((minX <= sol_pt2.pose.pose.position.x <= maxX) and (minY <= sol_pt2.pose.pose.position.y <= maxY)):
-    #                 foundIntersection = True
-    #                 # if both solutions are in range, check which one is better
-    #                 if ((minX <= sol_pt1.pose.pose.position.x <= maxX) and (minY <= sol_pt1.pose.pose.position.y <= maxY)) and ((minX <= sol_pt2.pose.pose.position.x <= maxX) and (minY <= sol_pt2.pose.pose.position.y <= maxY)):
-    #                     # make the decision by compare the distance between the intersections and the next point in path
-    #                     sol_pt1_to_path = np.sqrt((sol_pt1.pose.pose.position.x-path[idx+1][0])**2 + (sol_pt1.pose.pose.position.y-path[idx+1][1])**2)
-    #                     sol_pt2_to_path = np.sqrt((sol_pt2.pose.pose.position.x-path[idx+1][0])**2 + (sol_pt2.pose.pose.position.y-path[idx+1][1])**2)
-    #                     if sol_pt1_to_path < sol_pt2_to_path:
-    #                     # if self.pt_to_pt_distance(sol_pt1, path[idx+1]) < self.pt_to_pt_distance(sol_pt2, path[idx+1]):
-    #                         goalPt = sol_pt1
-    #                         # goalPt.pose.pose.position.x = sol_pt1.pose.pose.position.x
-    #                         # goalPt.pose.pose.position.y = sol_pt1.pose.pose.position.y
-    #                     else:
-    #                         goalPt = sol_pt2
-    #                         # goalPt.pose.pose.position.x = sol_pt2.pose.pose.position.x
-    #                         # goalPt.pose.pose.position.y = sol_pt2.pose.pose.position.y
-
-    #                 # if not both solutions are in range, take the one that's in range
-    #                 else:
-    #                     # if solution pt1 is in range, set that as goal point
-    #                     if (minX <= sol_pt1.pose.pose.position.x <= maxX) and (minY <= sol_pt1.pose.pose.position.y <= maxY):
-    #                         goalPt = sol_pt1
-    #                         # goalPt.pose.pose.position.x = sol_pt1.pose.pose.position.x
-    #                         # goalPt.pose.pose.position.y = sol_pt1.pose.pose.position.y
-    #                     else:
-    #                         goalPt = sol_pt2
-    #                         # goalPt.pose.pose.position.x = sol_pt2.pose.pose.position.x
-    #                         # goalPt.pose.pose.position.y = sol_pt2.pose.pose.position.y
-            
-    #                 # only exit loop if the solution pt found is closer to the next pt in path than the current pos
-    #                 goal_to_path_dist = np.sqrt((goalPt.pose.pose.position.y-path[idx+1][1])**2 + (goalPt.pose.pose.position.x-path[idx+1][0])**2)
-    #                 curr_to_path_dist = np.sqrt((currentPos.pose.pose.position.x-path[idx+1][0])**2 + (currentPos.pose.pose.position.y-path[idx+1][1])**2)
-    #                 # if self.pt_to_pt_distance (goalPt, path[idx+1]) < self.pt_to_pt_distance ([currentX, currentY], path[idx+1]):
-    #                 if goal_to_path_dist < curr_to_path_dist:
-    #                     # update lastFoundIndex and exit
-    #                     lastFoundIndex = idx
-    #                     print("exit loop if the solution pt found is closer to the next pt in path than the current pos")
-    #                     break
-    #                 else:
-    #                     # in case for some reason the robot cannot find intersection in the next path segment, but we also don't want it to go backward
-    #                     lastFoundIndex = idx+1
-    #                     print("robot cannot find intersection in the next path segment, but we also don't want it to go backward")
-    #             # if no solutions are in range
-    #             else:
-    #                 foundIntersection = False
-    #                 # no new intersection found, potentially deviated from the path
-    #                 # follow path[lastFoundIndex]
-    #                 # goalPt = [path[lastFoundIndex][0], path[lastFoundIndex][1]]
-    #                 goalPt.pose.pose.position.x = path[lastFoundIndex][0]
-    #                 goalPt.pose.pose.position.y = path[lastFoundIndex][1]
-    #     # obtained goal point, now compute turn vel
-	#     # initialize proportional controller constant
-    #     Kp = 5.5
-    #     # calculate absTargetAngle with the atan2 function
-    #     dy = goalPt.pose.pose.position.y-currentPos.pose.pose.position.y
-    #     dx = goalPt.pose.pose.position.x-currentPos.pose.pose.position.x
-    #     absTargetAngle = math.atan2(dy, dx)
-    #     # absTargetAngle = math.atan2 (goalPt.pose.pose.position.y-currentPos.pose.pose.position.y, goalPt[0]-currentPos.pose.pose.position.x) *180/np.pi
-    #     if absTargetAngle < 0: absTargetAngle += 360
-    #     # compute turn error by finding the minimum angle
-    #     turnError = absTargetAngle - currentHeading
-    #     if turnError > 180 or turnError < -180 :
-    #         turnError = -1 * self.sgn(turnError) * (360 - abs(turnError))
-    #     # apply proportional controller
-    #     turnVel = Kp*turnError
-    #     txt_debug = "p1: {}, p2:{}, dx: {}, dy:{}, d: {}".format([x1,y1],[x2,y2],dx,dy,discriminant)
-    #     print(txt_debug)
-    #     return goalPt, lastFoundIndex, turnVel
 
     def pure_pursuit(self,path, currentPos, currentHeading, lookAheadDis, LFindex) :
         # extract currentX and currentY
@@ -413,16 +304,24 @@ class PurePursuitNode(Node):
         self.gen_x = []
         self.gen_y = []
 
+        self.curr_pose.header.stamp = self.get_clock().now().to_msg()
+        self.curr_pose.header.frame_id = 'odom'
+        self.goal_pose.header.stamp = self.get_clock().now().to_msg()
+        self.goal_pose.header.frame_id = 'odom'
+
         for i in range(0, len(self.path)):
             self.gen_x.append(self.path[i][0])
             self.gen_y.append(self.path[i][1])
 
         if self.lastFoundIndex <= len(self.path)-2 :
-            plt.figure(figsize=(12, 8))
+            # plt.figure(figsize=(12, 8))
+            plt.figure(figsize=(6, 4))
             while(self.pt_to_pt_distance(self.curr_pose, self.reach_point) >= self.lookahead_distance) and (self.pt_to_pt_distance(self.curr_pose, self.reach_point) <= 20):
-                self.time_stamp = self.get_clock().now()
-                self.curr_time = self.time_stamp.seconds_nanoseconds()[0]+self.time_stamp.seconds_nanoseconds()[1]/1e9
+                # self.time_stamp = self.get_clock().now()
+                # self.curr_time = self.time_stamp.seconds_nanoseconds()[0]+self.time_stamp.seconds_nanoseconds()[1]/1e9
                 # self.dt = self.curr_time-self.prev_time
+                self.curr_pose.header.stamp = self.get_clock().now().to_msg()
+                self.goal_pose.header.stamp = self.get_clock().now().to_msg()
                 self.goal_pose, self.lastFoundIndex, self.turn_vel = self.pure_pursuit(self.path, self.curr_pose, self.curr_heading, self.lookahead_distance, self.lastFoundIndex)
                 txt_info = "index: {}, curr_pose: {}, goal_pose: {}. curr_head: {}".format(self.lastFoundIndex, [self.curr_pose.pose.pose.position.x,self.curr_pose.pose.pose.position.y],
                                                                             [self.goal_pose.pose.pose.position.x,self.goal_pose.pose.pose.position.y], self.curr_heading)
@@ -445,10 +344,26 @@ class PurePursuitNode(Node):
                 self.traj_ego_x.append(self.curr_pose.pose.pose.position.x)
                 self.traj_ego_y.append(self.curr_pose.pose.pose.position.y)
                 self.prev_heading = self.curr_heading
+
+                self.curr_quat = quaternion_from_euler(0, 0, self.curr_heading)
+                self.goal_quat = quaternion_from_euler(0, 0, self.yaw_err)
+                
+                self.curr_pose.pose.pose.orientation.x = self.curr_quat[0]
+                self.curr_pose.pose.pose.orientation.y = self.curr_quat[1]
+                self.curr_pose.pose.pose.orientation.z = self.curr_quat[2]
+                self.curr_pose.pose.pose.orientation.w = self.curr_quat[3]
+                self.goal_pose.pose.pose.orientation.x = self.curr_quat[0]
+                self.goal_pose.pose.pose.orientation.y = self.curr_quat[1]
+                self.goal_pose.pose.pose.orientation.z = self.curr_quat[2]
+                self.goal_pose.pose.pose.orientation.w = self.curr_quat[3]
+
+                self.curr_publisher.publish(self.curr_pose)
+                self.goal_publisher.publish(self.goal_pose)
+
                 # print(txt_info)
                 if self.plot:
                     self.plot_trajectory()
-                self.prev_time = time.time()
+                # self.prev_time = time.time()
     
     def plot_trajectory(self):
         plt.cla()

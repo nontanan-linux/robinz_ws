@@ -31,6 +31,7 @@ install(PROGRAMS
   scripts/pure_pursuit_node.py
   scripts/path_publisher.py
   scripts/path_recoder.py
+  scripts/path_tracker_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
