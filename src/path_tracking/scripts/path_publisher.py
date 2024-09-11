@@ -1,60 +1,54 @@
 #!/usr/bin/python3
-
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Path
 from geometry_msgs.msg import PoseStamped
-from nav_msgs.msg import Odometry
 import csv
 
-class PathRecorder(Node):
-
+class PathPublisher(Node):
     def __init__(self):
-        super().__init__('path_recorder')
-        self.path_publisher = self.create_publisher(Path, 'recorded_path', 10)
-        self.pose_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
-        
-        self.path = Path()
-        self.path.header.frame_id = 'odom'
-        self.path.header.stamp = self.get_clock().now().to_msg()
-        
-        self.csv_file = open('/tmp/recorded_path.csv', 'w', newline='')
-        self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow(['x', 'y', 'z', 'orientation_x', 'orientation_y', 'orientation_z', 'orientation_w'])
+        super().__init__('path_publisher')
+        self.publisher_ = self.create_publisher(Path, 'path', 10)
+        self.timer = self.create_timer(2.0, self.timer_callback)  # Publish every 2 seconds
+        self.path_msg = Path()
+        self.path_msg.header.frame_id = "map"
+        self.waypoints = self.load_waypoints_from_csv('/home/nontanan/robinz_ws/src/path_tracking/csv/waypoint.csv')  # Load waypoints from CSV
 
-    def odom_callback(self, msg):
-        pose = PoseStamped()
-        pose.header.frame_id = 'odom'
-        pose.header.stamp = self.get_clock().now().to_msg()
-        pose.pose = msg.pose.pose
-        self.path.poses.append(pose)
-        self.save_to_csv(pose.pose)
-        self.publish_path()
+    def load_waypoints_from_csv(self, csv_file):
+        waypoints = []
+        with open(csv_file, mode='r') as file:
+            csv_reader = csv.DictReader(file)
+            for row in csv_reader:
+                x = float(row['x'])
+                y = float(row['y'])
+                z = float(row['z'])
+                waypoints.append([x, y, z])
+        return waypoints
 
-    def save_to_csv(self, pose):
-        self.csv_writer.writerow([
-            pose.position.x,
-            pose.position.y,
-            pose.position.z,
-            pose.orientation.x,
-            pose.orientation.y,
-            pose.orientation.z,
-            pose.orientation.w
-        ])
+    def timer_callback(self):
+        self.path_msg.header.stamp = self.get_clock().now().to_msg()
+        self.path_msg.poses = []
 
-    def publish_path(self):
-        self.path.header.stamp = self.get_clock().now().to_msg()
-        self.path_publisher.publish(self.path)
-        self.get_logger().info('Publishing recorded path')
+        # Convert CSV waypoints to PoseStamped and fill Path message
+        for waypoint in self.waypoints:
+            pose = PoseStamped()
+            pose.header.frame_id = "map"
+            pose.header.stamp = self.get_clock().now().to_msg()
+            pose.pose.position.x = waypoint[0]
+            pose.pose.position.y = waypoint[1]
+            pose.pose.position.z = waypoint[2]
+            pose.pose.orientation.w = 1.0  # No rotation
+            self.path_msg.poses.append(pose)
 
-    def __del__(self):
-        self.csv_file.close()
+        # Publish the path
+        self.publisher_.publish(self.path_msg)
+        self.get_logger().info(f'Publishing path with {len(self.path_msg.poses)} waypoints.')
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PathRecorder()
-    rclpy.spin(node)
-    node.destroy_node()
+    path_publisher = PathPublisher()
+    rclpy.spin(path_publisher)
+    path_publisher.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':

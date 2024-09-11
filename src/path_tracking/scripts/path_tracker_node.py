@@ -73,7 +73,6 @@ class PID:
 		return output
 
 class PurePursuitNode(Node):
-
     def __init__(self):
         super().__init__('pure_pursuit_node')
         self.declare_parameter('lookahead_distance', 0.25)
@@ -82,7 +81,7 @@ class PurePursuitNode(Node):
         self.declare_parameter('wheel_length', 0.3)
         self.declare_parameter('wheel_width', 0.2)
         self.declare_parameter('wheel_base', 2.0)
-        self.declare_parameter('linear_vel', 0.5)
+        self.declare_parameter('linear_vel', 0.2)
         self.lookahead_distance = self.get_parameter('lookahead_distance').get_parameter_value().double_value
         self.linear_vel = self.get_parameter('linear_vel').get_parameter_value().double_value
         # self.pose_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
@@ -269,7 +268,7 @@ class PurePursuitNode(Node):
 
         # obtained goal point, now compute turn vel
         # initialize proportional controller constant
-        Kp = 5.5
+        Kp = 2.5
 
         # calculate absTargetAngle with the atan2 function
         print(goalPt)
@@ -306,8 +305,10 @@ class PurePursuitNode(Node):
 
         self.curr_pose.header.stamp = self.get_clock().now().to_msg()
         self.curr_pose.header.frame_id = 'odom'
+        self.curr_pose.child_frame_id = 'base_link'
         self.goal_pose.header.stamp = self.get_clock().now().to_msg()
         self.goal_pose.header.frame_id = 'odom'
+        self.goal_pose.child_frame_id = 'base_link'
 
         for i in range(0, len(self.path)):
             self.gen_x.append(self.path[i][0])
@@ -381,7 +382,7 @@ class PurePursuitNode(Node):
 
     def load_path_from_csv(self, file_path):
         path = Path()
-        path.header.frame_id = 'odom'
+        path.header.frame_id = 'map'
 
         with open(file_path, 'r') as csv_file:
             csv_reader = csv.reader(csv_file)

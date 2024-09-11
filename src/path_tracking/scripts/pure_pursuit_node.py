@@ -21,7 +21,9 @@ class PurePursuitNode(Node):
         self.cmd_vel_publisher = self.create_publisher(Twist, '/cmd_vel', 10)
 
         self.current_pose = None
-        self.path = self.load_path_from_csv('/home/nontanan/robinz_ws/src/path_tracking/csv/recorded_path.csv')
+        # self.path = self.load_path_from_csv('/home/nontanan/robinz_ws/src/path_tracking/csv/recorded_path.csv')
+        fileName = '/home/nontanan/robinz_ws/src/path_tracking/csv/waypoint.csv'
+        self.path = self.load_path_from_csv(fileName)
 
         self.path_time = self.create_timer(0.5, self.publish_path)
 
@@ -88,7 +90,7 @@ class PurePursuitNode(Node):
 
         cmd_vel = Twist()
         cmd_vel.linear.x = 0.3  # Adjust speed as necessary
-        cmd_vel.angular.z =  0.12*(angle_to_target - self.get_yaw_from_pose(self.current_pose))
+        cmd_vel.angular.z =  0.08*(angle_to_target - self.get_yaw_from_pose(self.current_pose))
         # info_txt = "vel: {}, ang: {}, curr_pose: {}, goal_pose: {}".format(cmd_vel.linear.x, angle_to_target, curr_pose, goal_pose)
         info_txt = "curr_pose: {}, curr_heading: {}, track_pose: {}, track_heading: {}".format(curr_pose, curr_yaw, goal_pose, angle_to_target)
         print(info_txt)

@@ -1,0 +1,3 @@
+[console_scripts]
+auto_initialpose = robinz_vehicle_launch.auto_initialpose:main
+python_node = robinz_vehicle_launch.python_node:main

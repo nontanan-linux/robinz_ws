@@ -1,7 +1,7 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, TimerAction
 from nav2_common.launch import RewrittenYaml
 from ament_index_python.packages import get_package_share_directory
 import os
@@ -22,11 +22,12 @@ def generate_launch_description():
             description='fonfig namespace'
     )
     args_use_sim_time = DeclareLaunchArgument(
-            'use_sim_time', default_value='false',
+            'use_sim_time', default_value='true',
             description='Use simulation (Gazebo) clock if true')
     args_autostart = DeclareLaunchArgument(
-            'autostart', default_value='true',
-            description='Automatically startup the nav2 stack')
+        'autostart', default_value='true',
+        description='Automatically startup the nav2 stack'
+    )
 
     # Create our own temporary YAML files that include substitutions
     param_substitutions = {
@@ -39,34 +40,17 @@ def generate_launch_description():
         param_rewrites=param_substitutions,
         convert_types=True)
     
-    localize_config = os.path.join(
-        get_package_share_directory('particle_filter'),
-        'config',
-        'localize.yaml'
-    )
-    
-    localize_config_dict = yaml.safe_load(open(localize_config, 'r'))
-    map_name = localize_config_dict['map_server']['ros__parameters']['map']
-
-    localize_la = DeclareLaunchArgument(
-        'localize_config',
-        default_value=localize_config,
-        description='Localization configs')
-    ld = LaunchDescription([localize_la])
-
-    # nodes
     map_server_node = Node(
         package='nav2_map_server',
         executable='map_server',
         name='map_server',
         namespace=namespace,
-        parameters=[{'yaml_filename': os.path.join(get_package_share_directory('particle_filter'), 'maps', map_name + '.yaml')},
+        parameters=[{'yaml_filename': '/home/nontanan/robinz_ws/src/robinz_vehicle_launch/maps/test_map_panal.yaml'},
                     {'topic': 'map'},
                     {'frame_id': 'map'},
                     {'output': 'screen'},
                     {'use_sim_time': True}]
     )
-    
     amcl_node = Node(
         package='nav2_amcl',
         executable='amcl',
@@ -75,14 +59,6 @@ def generate_launch_description():
         output='screen',
         # parameters=[configured_params],
         # remappings=remappings
-    )
-
-    rviz_node = Node(
-        package='rviz2',
-        executable='rviz2',
-        name='rviz',
-        namespace=namespace,
-        arguments=['-d', os.path.join(get_package_share_directory('robinz_vehicle_launch'), 'rviz', 'simulation.rviz')]
     )
     nav_lifecycle_node = Node(
         package='nav2_lifecycle_manager',
@@ -93,8 +69,32 @@ def generate_launch_description():
         parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')},
                     {'autostart': autostart},
                     {'node_names': lifecycle_nodes}])
+    
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz',
+        namespace=namespace,
+        arguments=['-d', os.path.join(get_package_share_directory('robinz_vehicle_launch'), 'rviz', 'simulation.rviz')]
+    )
 
-    # finalize
+    # Initial pose publisher
+    initial_pose_publisher = Node(
+        package='robinz_vehicle_launch',  # Replace this with a package that contains the publishing node
+        executable='auto_initialpose',  # The executable that will publish initial pose
+        name='auto_initialpose',
+        namespace=namespace,
+        output='screen',
+        remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')]
+    )
+    # Add initial pose timer
+    initial_pose_timer = TimerAction(
+        period = 2.0,  # Adjust the delay as needed
+        actions = [initial_pose_publisher]
+    )
+    
+    # Finalize launch description
+    ld = LaunchDescription()
     ld.add_action(args_namespace)
     ld.add_action(args_use_sim_time)
     ld.add_action(args_autostart)
@@ -102,5 +102,6 @@ def generate_launch_description():
     ld.add_action(map_server_node)
     ld.add_action(amcl_node)
     ld.add_action(rviz_node)
+    # ld.add_action(initial_pose_timer)
 
     return ld

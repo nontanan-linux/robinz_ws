@@ -24,7 +24,8 @@ install(TARGETS
 
 # Install Python scripts
 install(PROGRAMS
-  scripts/python_node.py
+  robinz_vehicle_launch/python_node.py
+  robinz_vehicle_launch/auto_initialpose.py
   DESTINATION lib/${PROJECT_NAME})
 
 
