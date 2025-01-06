@@ -14,7 +14,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     autostart = LaunchConfiguration('autostart')
     params_file = LaunchConfiguration('params_file')
-    lifecycle_nodes = ['map_server', 'amcl']
+    lifecycle_nodes = ['amcl']
 
     remappings = [('/tf', 'tf'),('/tf_static', 'tf_static')]
     args_namespace = DeclareLaunchArgument(
@@ -40,17 +40,6 @@ def generate_launch_description():
         param_rewrites=param_substitutions,
         convert_types=True)
     
-    map_server_node = Node(
-        package='nav2_map_server',
-        executable='map_server',
-        name='map_server',
-        namespace=namespace,
-        parameters=[{'yaml_filename': '/home/nontanan/robinz_ws/src/robinz_vehicle_launch/maps/test_map_panal.yaml'},
-                    {'topic': 'map'},
-                    {'frame_id': 'map'},
-                    {'output': 'screen'},
-                    {'use_sim_time': True}]
-    )
     amcl_node = Node(
         package='nav2_amcl',
         executable='amcl',
@@ -84,7 +73,6 @@ def generate_launch_description():
     ld.add_action(args_use_sim_time)
     ld.add_action(args_autostart)
     ld.add_action(nav_lifecycle_node)
-    ld.add_action(map_server_node)
     ld.add_action(amcl_node)
     ld.add_action(rviz_node)
 

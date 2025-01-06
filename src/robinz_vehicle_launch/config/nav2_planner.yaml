@@ -1,0 +1,36 @@
+# Global Costmap parameters
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      robot_base_frame: "base_link"
+      update_frequency: 5.0
+      publish_frequency: 5.0
+      static_map: true
+      transform_tolerance: 0.5
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+
+# Local Costmap parameters
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      robot_base_frame: "base_link"
+      update_frequency: 5.0
+      publish_frequency: 5.0
+      transform_tolerance: 0.5
+      plugins: ["obstacle_layer", "inflation_layer"]
+
+# Planner parameters
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 20.0
+    use_sim_time: true
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5
+
+# Lifecycle Manager parameters
+lifecycle_manager:
+  ros__parameters:
+    autostart: true
+    node_names: ["planner_server", "controller_server", "recovery_server", "global_costmap", "local_costmap"]

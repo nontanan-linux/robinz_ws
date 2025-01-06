@@ -88,8 +88,7 @@ class PurePursuitNode(Node):
         self.path_publisher = self.create_publisher(Path, 'tracking_path', 10)
         self.curr_publisher = self.create_publisher(Odometry, 'sym_odom', 10)
         self.goal_publisher = self.create_publisher(Odometry, 'target', 10)
-        self.cmd_vel_publisher = self.create_publisher(Twist, '/ctrl_vel', 10)
-
+        self.cmd_vel_publisher = self.create_publisher(Twist, 'ctrl_vel', 10)
         # initial state
         self.current_pose = None
         self.ctrl_vel = Twist()
@@ -108,15 +107,12 @@ class PurePursuitNode(Node):
         self.using_rotation = False
         self.traj_ego_x = []
         self.traj_ego_y = []
-        # self.path = self.load_path_from_csv('/home/nontanan/robinz_ws/src/path_tracking/csv/recorded_path.csv')
         fileName = '/home/nontanan/robinz_ws/src/path_tracking/csv/waypoint.csv'
-        # fileName = "/home/nontanan/pure-pursuit/traject.csv"
-        flag = self.verify_path_data(fileName)
-        ref_path = []
-        if(flag):
+        self.path_msg = Path()
+        self.path_msg.header.frame_id = "map"
+        self.waypoints = self.load_waypoints_from_csv(fileName)
+        if self.verify_path_data(fileName):
             self.path = self.refrom_path_data(fileName)
-            self.path_data = self.load_path_from_csv(fileName)
-            # self.path_msgs = self.load_path_from_csv()
         self.path_time = self.create_timer(0.5, self.publish_path)
         self.plot = True
 
@@ -133,16 +129,6 @@ class PurePursuitNode(Node):
             return True
         else:
             return False
-        # data_t = df["t_stamp"]
-        # data_x = df["x_(m)"]
-        # data_y = df["y_(m)"]
-        # data_vel = df["speed_(m/s)"]
-        # data_yaw = df["yaw_(rad)"]
-        # if (data_t.shape[0]== data_x.shape[0] == data_y.shape[0] == data_vel.shape[0] == data_yaw.shape[0]):
-        #     return True
-        # else:
-        #     print("t:{}, x:{}, y:{}, vel:{}, yaw:{}".format(data_t.shape[0],data_x.shape[0],data_y.shape[0],data_vel.shape[0],data_yaw.shape[0]))
-        #     return False
 
     def refrom_path_data(self, fileName):
         path_reform = []
@@ -155,24 +141,27 @@ class PurePursuitNode(Node):
         data_qw = df['orientation_w']
         for idx in range(0, len(data_x)-1):
             path_reform.append([data_x[idx], data_y[idx], data_qx[idx], data_qy[idx], data_qz[idx], data_qw[idx]])
-        # path_reform = []
-        # df = pd.read_csv(fileName)
-        # data_t = df["t_stamp"]
-        # data_x = df["x_(m)"]
-        # data_y = df["y_(m)"]
-        # data_vel = df["speed_(m/s)"]
-        # data_yaw = df["yaw_(rad)"]
-        # for idx in range(0, len(data_t)-1):
-        #     path_reform.append([data_x[idx], data_y[idx], data_vel[idx], data_yaw[idx]])
         return path_reform
 
     def publish_path(self):
-        self.path_publisher.publish(self.path_data)
+        self.path_msg.header.stamp = self.get_clock().now().to_msg()
+        self.path_msg.poses = []
+        # Convert CSV waypoints to PoseStamped and fill Path message
+        for waypoint in self.waypoints:
+            pose = PoseStamped()
+            pose.header.frame_id = "map"
+            pose.header.stamp = self.get_clock().now().to_msg()
+            pose.pose.position.x = waypoint[0]
+            pose.pose.position.y = waypoint[1]
+            pose.pose.position.z = waypoint[2]
+            pose.pose.orientation.w = 1.0  # No rotation
+            self.path_msg.poses.append(pose)
+        # Publish the path
+        self.path_publisher.publish(self.path_msg)
 
-
-    # def odom_callback(self, msg):
-    #     self.curr_pose = msg
-        # self.current_pose = msg.pose.pose
+    def odom_callback(self, msg):
+        self.curr_pose = msg
+        self.current_pose = msg.pose.pose
     
     def pt_to_pt_distance (self, pt1, pt2):
         pt1 = [pt1.pose.pose.position.x, pt1.pose.pose.position.y]
@@ -283,7 +272,7 @@ class PurePursuitNode(Node):
         # apply proportional controller
         turnVel = Kp*turnError
         # print(dx,dy,discriminant)
-        txt_debug = "dx: {}, dy:{}, d: {}".format(dx,dy,discriminant)
+        # txt_debug = "dx: {}, dy:{}, d: {}".format(dx,dy,discriminant)
         # print(txt_debug)
         goal_return.pose.pose.position.x = goalPt[0]
         goal_return.pose.pose.position.y = goalPt[1]
@@ -389,16 +378,27 @@ class PurePursuitNode(Node):
             next(csv_reader)  # Skip header row
             for row in csv_reader:
                 pose = PoseStamped()
-                pose.header.frame_id = 'odom'
+                pose.header.frame_id = 'map'
                 pose.pose.position.x = float(row[0])
                 pose.pose.position.y = float(row[1])
-                pose.pose.position.z = float(row[2])
+                pose.pose.position.z = 0.0  # Assuming 2D plane
                 pose.pose.orientation.x = float(row[3])
                 pose.pose.orientation.y = float(row[4])
                 pose.pose.orientation.z = float(row[5])
                 pose.pose.orientation.w = float(row[6])
                 path.poses.append(pose)
         return path
+    
+    def load_waypoints_from_csv(self, csv_file):
+        waypoints = []
+        with open(csv_file, mode='r') as file:
+            csv_reader = csv.DictReader(file)
+            for row in csv_reader:
+                x = float(row['x'])
+                y = float(row['y'])
+                z = float(row['z'])
+                waypoints.append([x, y, z])
+        return waypoints
 
 def main(args=None):
     rclpy.init(args=args)

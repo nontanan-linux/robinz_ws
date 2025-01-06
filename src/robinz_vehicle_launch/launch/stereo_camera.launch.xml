@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://www.ros.org/schema/launch/launch.xsd">
+
+    <!-- Declare arguments for left and right camera namespaces -->
+    <arg name="left_ns" default="stereo/left" description="Namespace for the left camera" />
+    <arg name="right_ns" default="stereo/right" description="Namespace for the right camera" />
+
+    <!-- Declare arguments for left and right camera ports -->
+    <arg name="left_port" default="/dev/video2" description="Port for the left camera" />
+    <arg name="right_port" default="/dev/video0" description="Port for the right camera" />
+    
+    <node
+        pkg="v4l2_camera"
+        exec="v4l2_camera_node"
+        name="left_camera"
+        output="screen">
+        <!-- Use the left_port argument for the video_device parameter -->
+        <param name="video_device" value="$(arg left_port)" />
+        <remap from="image_raw" to="/$(arg left_ns)/image_raw" />
+        <remap from="camera_info" to="/$(arg left_ns)/camera_info" />
+    </node>
+
+    <!-- Launch the right camera node -->
+    <node
+        pkg="v4l2_camera"
+        exec="v4l2_camera_node"
+        name="right_camera"
+        output="screen">
+        <!-- Use the right_port argument for the video_device parameter -->
+        <param name="video_device" value="$(arg right_port)" />
+        <remap from="image_raw" to="/$(arg right_ns)/image_raw" />
+        <remap from="camera_info" to="/$(arg right_ns)/camera_info" />
+    </node>
+
+    <!-- Launch stereo_image_proc to process stereo data -->
+    <node
+        pkg="stereo_image_proc"
+        exec="stereo_image_proc"
+        name="stereo_image_proc_node"
+        output="screen">
+        <remap from="left/image_raw" to="/$(arg left_ns)/image_raw" />
+        <remap from="left/camera_info" to="/$(arg left_ns)/camera_info" />
+        <remap from="right/image_raw" to="/$(arg right_ns)/image_raw" />
+        <remap from="right/camera_info" to="/$(arg right_ns)/camera_info" />
+    </node>
+</launch>
+
+convert to python launch

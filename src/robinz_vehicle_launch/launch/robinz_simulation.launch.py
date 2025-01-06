@@ -57,6 +57,7 @@ def generate_launch_description():
         name='amcl',
         namespace=namespace,
         output='screen',
+        parameters=[{'use_sim_time': True},]
         # parameters=[configured_params],
         # remappings=remappings
     )
@@ -81,17 +82,17 @@ def generate_launch_description():
     # Initial pose publisher
     initial_pose_publisher = Node(
         package='robinz_vehicle_launch',  # Replace this with a package that contains the publishing node
-        executable='auto_initialpose',  # The executable that will publish initial pose
-        name='auto_initialpose',
+        executable='initialpose',  # The executable that will publish initial pose
+        name='initialpose',
         namespace=namespace,
         output='screen',
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')]
     )
     # Add initial pose timer
-    initial_pose_timer = TimerAction(
-        period = 2.0,  # Adjust the delay as needed
-        actions = [initial_pose_publisher]
-    )
+    # initial_pose_timer = TimerAction(
+    #     period = 3.0,  # Adjust the delay as needed
+    #     actions = [initial_pose_publisher]
+    # )
     
     # Finalize launch description
     ld = LaunchDescription()
@@ -102,6 +103,6 @@ def generate_launch_description():
     ld.add_action(map_server_node)
     ld.add_action(amcl_node)
     ld.add_action(rviz_node)
-    # ld.add_action(initial_pose_timer)
+    ld.add_action(initial_pose_publisher)
 
     return ld

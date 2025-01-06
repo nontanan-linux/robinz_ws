@@ -1,7 +1,7 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, TimerAction
 from nav2_common.launch import RewrittenYaml
 from ament_index_python.packages import get_package_share_directory
 import os
@@ -14,7 +14,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     autostart = LaunchConfiguration('autostart')
     params_file = LaunchConfiguration('params_file')
-    lifecycle_nodes = ['map_server', 'amcl']
+    lifecycle_nodes = ['map_server']
 
     remappings = [('/tf', 'tf'),('/tf_static', 'tf_static')]
     args_namespace = DeclareLaunchArgument(
@@ -51,15 +51,6 @@ def generate_launch_description():
                     {'output': 'screen'},
                     {'use_sim_time': True}]
     )
-    amcl_node = Node(
-        package='nav2_amcl',
-        executable='amcl',
-        name='amcl',
-        namespace=namespace,
-        output='screen',
-        # parameters=[configured_params],
-        # remappings=remappings
-    )
     nav_lifecycle_node = Node(
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
@@ -85,7 +76,5 @@ def generate_launch_description():
     ld.add_action(args_autostart)
     ld.add_action(nav_lifecycle_node)
     ld.add_action(map_server_node)
-    ld.add_action(amcl_node)
     ld.add_action(rviz_node)
-
     return ld

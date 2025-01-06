@@ -1,0 +1,45 @@
+planner_server:
+  ros__parameters:
+    planner_plugins: ["SmacPlannerLattice"]
+
+    SmacPlannerLattice:
+      plugin: "nav2_smac_planner/SmacPlannerLattice"
+      tolerance: 0.5
+      downsample_costmap: true
+      minimum_turning_radius: 0.5
+      lookup_table_size: 50
+      motion_model_for_search: "DIFF"  # or "ACK" for Ackermann drive
+      lattice_filepath: '/home/nontanan/robinz_ws/src/robinz_vehicle_launch/csv/robot_path.csv'  # Your custom motion primitives
+      max_planning_time: 2.0
+      goal_reached_tol: 0.05
+
+costmap_server:
+  ros__parameters:
+    global_costmap:
+      global_frame: map
+      robot_base_frame: base_link
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      resolution: 0.05
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+
+    local_costmap:
+      global_frame: odom
+      robot_base_frame: base_link
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      resolution: 0.05
+      plugins: ["obstacle_layer", "inflation_layer"]
+
+    obstacle_layer:
+      enabled: True
+      observation_sources: scan
+      scan:
+        topic: /scan
+        max_obstacle_height: 2.0
+        obstacle_range: 2.5
+        raytrace_range: 3.0
+        inf_is_valid: True
+        clearing: True
+        marking: True
+        data_type: LaserScan
