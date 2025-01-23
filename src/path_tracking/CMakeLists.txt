@@ -32,6 +32,7 @@ install(PROGRAMS
   scripts/path_publisher.py
   scripts/path_recoder.py
   scripts/path_tracker_node.py
+  scripts/path_tracker.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

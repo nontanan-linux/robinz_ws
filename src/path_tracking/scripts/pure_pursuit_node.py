@@ -97,9 +97,9 @@ class PurePursuitNode(Node):
         self.path_len = []
 
         #bb variable
-        self.bp_ratio = 0.8 #ratio between bb_vel and pp_vel # 0 = 100% pp
+        self.bp_ratio = 0.0 #ratio between bb_vel and pp_vel # 0 = 100% pp
         self.bb_idx = 0 #current bb are on this index
-        self.k1 = 1 #parallel gain, gain to control theta
+        self.k1 = 1.25 #parallel gain, gain to control theta
         self.k2 = 10 #displacement gain, gain to control displacement
         self.bb_ratio = 0.2 #gain to move to next point 
         self.bb_vel = Twist()
@@ -141,9 +141,6 @@ class PurePursuitNode(Node):
     def tf_lookup(self,parent,child):
         try:
             return(self.tf_buffer.lookup_transform(parent,child,rclpy.time.Time()))
-            # self.tf_map_base = self.tf_buffer.lookup_transform('map','base_link',rclpy.time.Time())
-            # (_, _, angle) = euler_from_quaternion ([self.tf_map_base.transform.rotation.x,self.tf_map_base.transform.rotation.y,self.tf_map_base.transform.rotation.z,self.tf_map_base.transform.rotation.w])
-            # return self.tf_map_base.transform
         except:
             exc_info = sys.exc_info()
             y = traceback.format_exception(*exc_info)
@@ -207,22 +204,23 @@ class PurePursuitNode(Node):
             tf_map_base = self.tf_lookup('map', 'base_link')
             if not tf_map_base: return
             pp_linear_vel, pp_angular_vel = self.cal_pp_vel(msg, tf_map_base)
-            bb_linear_vel, bb_angular_vel = self.cal_bb_vel(tf_map_base)
+            bb_linear_vel, bb_angular_vel, diff = self.cal_bb_vel(tf_map_base)
             v_accel = self.cal_v_accelerate(msg)
             v_decel = self.cal_v_decelerate()  
-
-            print(pp_linear_vel,v_accel)
+            # print(pp_linear_vel,v_accel)
             if self.path.poses and not self.reach_state:
                 self.cmd_vel.linear.x = max(min(min((self.bp_ratio*bb_linear_vel+((1-self.bp_ratio)*pp_linear_vel)),v_accel),v_decel),self.min_linear_vel)
             else:
                 self.cmd_vel.linear.x = 0.0
-            
             if self.vehicle_model == 1:
                 self.cmd_vel.angular.z = self.bp_ratio*bb_angular_vel + ((1-self.bp_ratio)*pp_angular_vel)
             elif self.vehicle_model == 2:
-                self.cmd_vel.angular.z = self.angular_vel_to_steer(self.cmd_vel.linear.x,self.cmd_vel.angular.z)
+                self.cmd_vel.angular.z = bb_angular_vel
+                # self.cmd_vel.angular.z = self.angular_vel_to_steer(self.cmd_vel.linear.x,self.cmd_vel.angular.z)
+            # print(f'accel: {v_accel}, diff-angle: {diff_angle}, w.z: {self.cmd_vel.angular.z}')
+            print("path-angle: {:.4f}, robot-angle: {:.4f}, diff-angle: {:.4f}, wz: {:.4f}".format(diff[0], diff[1], diff[2], self.cmd_vel.angular.z))
+            # print("diff-angle: {:.4f}, wz: {:.4f}".format(diff[0], diff[1], diff[2], self.cmd_vel.angular.z))
             self.cmd_vel_publisher.publish(self.cmd_vel)
-
             if self.bb_idx >= self.leaving_idx and len(self.path_len) == 1 and not self.leaving_state:
                 self.result_status.data = 21
                 self.pub_result.publish(self.result_status)
@@ -235,7 +233,6 @@ class PurePursuitNode(Node):
                 self.result_status.data = 23
                 self.pub_result.publish(self.result_status)
                 self.reach_state = True
-
             self.prev_odom_time = self.curr_odom_time
     
     def bb_line_direction(self, point1, point2, point3):
@@ -250,6 +247,7 @@ class PurePursuitNode(Node):
     
     def cal_bb_vel(self,tf_map_base):
         bb_linear_vel = bb_angular_vel = 0
+        diff = [0.0,0.0,0.0]
         if self.path.poses and self.bb_idx < len(self.path.poses)-1:
             point1 = [self.path.poses[self.bb_idx].pose.position.x,self.path.poses[self.bb_idx].pose.position.y]
             point2 = [self.path.poses[self.bb_idx+1].pose.position.x,self.path.poses[self.bb_idx+1].pose.position.y]
@@ -265,6 +263,7 @@ class PurePursuitNode(Node):
             else:
                 diff_angle = path_angle-robot_angle
             diff_angle = (path_angle - robot_angle + math.pi) % (2 * math.pi) - math.pi
+            diff = [path_angle, robot_angle, diff_angle]
             # print('diff_angle,robot_angle,path_angle',robot_angle-path_angle,robot_angle,path_angle)
 
             if self.bb_idx < len(self.path.poses)-2 and ad > self.bb_ratio:
@@ -276,14 +275,15 @@ class PurePursuitNode(Node):
                 bb_linear_vel = self.path.poses[self.bb_idx].pose.position.z
             else:
                 bb_linear_vel = 0.0
-            bb_angular_vel = self.k1*diff_angle+self.k2*distance*direction*abs(bb_linear_vel)
-            if abs(bb_angular_vel) > self.max_angular_vel:
-                pct_angular = abs(bb_angular_vel)/abs(self.max_angular_vel)
-                bb_angular_vel = math.copysign(self.max_angular_vel,bb_angular_vel)
-                bb_linear_vel = bb_linear_vel/pct_angular
+            # bb_angular_vel = self.k1*diff_angle+self.k2*distance*direction*abs(bb_linear_vel)
+            bb_angular_vel = self.k1*diff_angle
+            # if abs(bb_angular_vel) > self.max_angular_vel:
+            #     pct_angular = abs(bb_angular_vel)/abs(self.max_angular_vel)
+            #     bb_angular_vel = math.copysign(self.max_angular_vel,bb_angular_vel)
+            #     bb_linear_vel = bb_linear_vel/pct_angular
         else:
             bb_linear_vel = bb_angular_vel = 0.0
-        return(bb_linear_vel,bb_angular_vel)
+        return(bb_linear_vel,bb_angular_vel, diff)
     
     def cal_pp_vel(self,odom,tf_map_base):
         self.cal_pp_index_and_lookahead(tf_map_base,odom)
@@ -312,7 +312,6 @@ class PurePursuitNode(Node):
             else:
                 pp_angular_vel = float(0)
                 pp_linear_vel = float(0)
-        
         else:
             pp_linear_vel = float(0)
             pp_angular_vel = float(0)
@@ -327,11 +326,13 @@ class PurePursuitNode(Node):
             if self.distance(self.path.poses[i].pose.position,tf_map_base.transform.translation) > self.ld :
                 self.pp_idx = i   
                 break
+
     def cal_v_accelerate(self,new_odom):
         if self.path.poses:
             return math.copysign((abs(new_odom.twist.twist.linear.x)+(self.accelerate*(self.curr_odom_time-self.prev_odom_time))),self.path.poses[self.bb_idx].pose.position.z) #V=U+aT
         else:
             return 0
+        
     def cal_v_decelerate(self):
         # return math.copysign((abs(new_odom.twist.twist.linear.x)-(self.decelerate*(self.odom_time-self.prev_odom_time))),new_odom.twist.twist.linear.x) #V=U+aT
         return math.sqrt(2*self.decelerate*abs(((self.path_length-1)-self.bb_idx)*self.path_resolution))  #U = sqrt(2(-a)s)
